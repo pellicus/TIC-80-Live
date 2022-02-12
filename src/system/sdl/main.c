@@ -59,6 +59,7 @@
 
 #define LOCK_MUTEX(MUTEX) SDL_LockMutex(MUTEX); SCOPE(SDL_UnlockMutex(MUTEX))
 
+
 enum 
 {
     tic_key_board = tic_keys_count + 1,
@@ -1514,13 +1515,15 @@ void tic_sys_default_mapping(tic_mapping* mapping)
         }
     }
 }
-
+#define LIVE_MAIN
+#include "live.h"
 static void gpuTick()
 {
     tic_mem* tic = platform.studio->tic;
 
     pollEvents();
 
+	liveTick();
     if(platform.studio->quit)
     {
 #if defined __EMSCRIPTEN__
@@ -1615,9 +1618,13 @@ static void emsGpuTick()
 
 #endif
 
+
+
 static s32 start(s32 argc, char **argv, const char* folder)
 {
     SDL_Init(SDL_INIT_VIDEO | SDL_INIT_AUDIO | SDL_INIT_JOYSTICK);
+
+	liveInit(argc, argv, folder);
     platform.studio = studioInit(argc, argv, TIC80_SAMPLERATE, folder);
 
     SCOPE(platform.studio->close())

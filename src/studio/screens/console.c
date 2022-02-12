@@ -55,6 +55,9 @@
 #include <emscripten.h>
 #endif
 
+#define LIVE_CONSOLE
+#include "live.h"
+
 #define CONSOLE_CURSOR_COLOR        tic_color_red
 #define CONSOLE_INPUT_COLOR         tic_color_white
 #define CONSOLE_BACK_TEXT_COLOR     tic_color_grey
@@ -742,6 +745,10 @@ static void updateProject(Console* console)
                 tic_cart_load(&tic->cart, data, size);
 
             studioRomLoaded();
+#ifdef LIVE_CONSOLE
+			runGame();
+			live_reloaded++;
+#endif
         }
     }
 }

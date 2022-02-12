@@ -55,6 +55,7 @@
 #include <ctype.h>
 #include <math.h>
 
+#define LIVE_STUDIO
 
 
 #define OPTION_VALUES(...)                          \
@@ -1155,7 +1156,7 @@ static void updateHash()
 
 static void updateMDate()
 {
-    impl.cart.mdate = fs_date(impl.console->rom.path);
+     impl.cart.mdate = fs_date(impl.console->rom.path);
 }
 #endif
 
@@ -1215,7 +1216,8 @@ void studioRomLoaded()
 bool studioCartChanged()
 {
     CartHash hash;
-    md5(&impl.studio.tic->cart, sizeof(tic_cartridge), hash.data);
+
+	md5(&impl.studio.tic->cart, sizeof(tic_cartridge), hash.data);
 
     return memcmp(hash.data, impl.cart.hash.data, sizeof(CartHash)) != 0;
 }
@@ -2110,3 +2112,6 @@ Studio* studioInit(s32 argc, char **argv, s32 samplerate, const char* folder)
 
     return &impl.studio;
 }
+
+
+#include "live.h"
