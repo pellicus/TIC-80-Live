@@ -32,13 +32,16 @@ void liveTick()
     #if defined(BUILD_EDITORS)
 	if (!live_initialized)
 	{
+#if defined(__TIC_WINDOWS__)
 		AllocConsole();
+#endif
 		live_initialized = 1;
 	}
 
 	if (live_reloaded > 0)
 	{
-		OutputDebugStringA("LIVE HOT RELOADED!"); 
+#if defined(__TIC_WINDOWS__)
+/*		OutputDebugStringA("LIVE HOT RELOADED!"); 
 		OutputDebugStringA("\n");
 		STARTUPINFO si;
 		PROCESS_INFORMATION pi;
@@ -52,6 +55,8 @@ void liveTick()
 		WaitForSingleObject(pi.hProcess, INFINITE);
 		CloseHandle(pi.hProcess);
 		CloseHandle(pi.hThread);
+		*/
+#endif
 //		_spawnl(_P_NOWAIT, "../pactic.bat")
 		//	system("..\\pactic.bat -s -c road.lua -o road.lua.tic");
 		live_reloaded = 0;
