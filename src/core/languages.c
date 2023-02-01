@@ -29,15 +29,24 @@ extern tic_script_config SquirrelSyntaxConfig;
 extern tic_script_config WrenSyntaxConfig;
 #endif
 
+#if defined(TIC_BUILD_WITH_WASM)
+extern tic_script_config WasmSyntaxConfig;
+#endif
+
+#if defined(TIC_BUILD_WITH_JANET)
+extern tic_script_config JanetSyntaxConfig;
+#endif
+
+
 tic_script_config* Languages[] = {
 
 	#if defined (TIC_BUILD_WITH_LUA)
 	&LuaSyntaxConfig,
 	#endif
 
-    #if defined(TIC_BUILD_WITH_MRUBY)
-    &MRubySyntaxConfig,
-    #endif
+  #if defined(TIC_BUILD_WITH_MRUBY)
+  &MRubySyntaxConfig,
+  #endif
 
 	#if defined(TIC_BUILD_WITH_JS)
 	&JsSyntaxConfig,
@@ -59,5 +68,12 @@ tic_script_config* Languages[] = {
 	&WrenSyntaxConfig,
 	#endif
 
-	NULL};
+  #if defined(TIC_BUILD_WITH_WASM)
+	&WasmSyntaxConfig,
+	#endif
 
+  #if defined(TIC_BUILD_WITH_JANET)
+  &JanetSyntaxConfig,
+  #endif
+
+	NULL};

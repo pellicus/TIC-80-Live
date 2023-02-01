@@ -192,16 +192,22 @@ static const tic_outline_item* getMoonOutline(const char* code, s32* size)
 
 tic_script_config MoonSyntaxConfig = 
 {
+    .id                 = 13,
     .name               = "moon",
     .fileExtension      = ".moon",
     .projectComment     = "--",
-    .init               = initMoonscript,
-    .close              = closeLua,
-    .tick               = callLuaTick,
-    .callback           =
     {
+      .init               = initMoonscript,
+      .close              = closeLua,
+      .tick               = callLuaTick,
+      .boot               = callLuaBoot,
+
+      .callback           =
+      {
         .scanline       = callLuaScanline,
         .border         = callLuaBorder,
+        .menu           = callLuaMenu,
+      },
     },
 
     .getOutline         = getMoonOutline,

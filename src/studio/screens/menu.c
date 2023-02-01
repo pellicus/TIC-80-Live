@@ -25,6 +25,7 @@
 #include "studio/fs.h"
 
 #include <math.h>
+#include <string.h>
 
 #define ANIM_STATES(macro)  \
     macro(idle)             \
@@ -39,6 +40,7 @@
 
 struct Menu
 {
+    Studio* studio;
     tic_mem* tic;
 
     s32 ticks;
@@ -49,7 +51,7 @@ struct Menu
     s32 backPos;
 
     void* data;
-    void(*back)(void*);
+    MenuItemHandler back;
 
     struct
     {
@@ -82,22 +84,13 @@ enum
 enum{TextMargin = 2, ItemHeight = TIC_FONT_HEIGHT + TextMargin * 2};
 enum{Hold = KEYBOARD_HOLD, Period = ItemHeight};
 
-static s32 linear(s32 d)
-{
-    return d;
-}
-
-static s32 easein(s32 d)
-{
-    return d * d;
-}
-
-static void emptyDone() {}
+static void emptyDone(void* data) {}
 
 static void menuUpDone(void* data)
 {
     Menu *menu = data;
     menu->pos = (menu->pos + (menu->count - 1)) % menu->count;
+    if (strcmp("", menu->items[menu->pos].label) == 0) return menuUpDone(data);
     menu->anim.pos = 0;
     menu->anim.movie = resetMovie(&menu->anim.idle);
 }
@@ -106,6 +99,7 @@ static void menuDownDone(void* data)
 {
     Menu *menu = data;
     menu->pos = (menu->pos + (menu->count + 1)) % menu->count;
+    if (strcmp("", menu->items[menu->pos].label) == 0) return menuDownDone(data);
     menu->anim.pos = 0;
     menu->anim.movie = resetMovie(&menu->anim.idle);
 }
@@ -120,7 +114,7 @@ static void closeDone(void* data)
 {
     Menu *menu = data;
     menu->anim.movie = resetMovie(&menu->anim.idle);
-    menu->items[menu->pos].handler(menu->data ? menu->data : &menu->pos);
+    menu->items[menu->pos].handler(menu->data, menu->pos);
 }
 
 static void backDone(void* data)
@@ -128,7 +122,7 @@ static void backDone(void* data)
     Menu *menu = data;
     menu->anim.movie = resetMovie(&menu->anim.idle);
     s32 pos = menu->backPos;
-    menu->back(menu->data);
+    menu->back(menu->data, 0);
     menu->pos = pos;
 }
 
@@ -179,16 +173,16 @@ static void drawBottomBar(Menu* menu, s32 x, s32 y)
     }
 }
 
-static void updateOption(MenuOption* option, s32 val)
+static void updateOption(MenuOption* option, s32 val, void* data)
 {
     option->pos = (option->pos + option->count + val) % option->count;
-    option->set(option->pos);
-    option->pos = option->get();
+    option->set(data, option->pos);
+    option->pos = option->get(data);
 }
 
 static void onMenuItem(Menu* menu, const MenuItem* item)
 {
-    playSystemSfx(2);
+    playSystemSfx(menu->studio, 2);
     menu->anim.movie = resetMovie(item->back ? &menu->anim.back : &menu->anim.close);
 }
 
@@ -197,33 +191,33 @@ static void drawOptionArrow(Menu* menu, MenuOption* option, s32 x, s32 y, s32 ic
     tic_rect left = {x - 1, y, TIC_FONT_WIDTH, TIC_FONT_HEIGHT};
     bool down = false;
     bool over = false;
-    if(checkMousePos(&left))
+    if(checkMousePos(menu->studio, &left))
     {
         over = true;
-        setCursor(tic_cursor_hand);
-        down = checkMouseDown(&left, tic_mouse_left);
+        setCursor(menu->studio, tic_cursor_hand);
+        down = checkMouseDown(menu->studio, &left, tic_mouse_left);
 
-        if(checkMouseClick(&left, tic_mouse_left))
+        if(checkMouseClick(menu->studio, &left, tic_mouse_left))
         {
-            playSystemSfx(2);
-            updateOption(option, delta);
+            playSystemSfx(menu->studio, 2);
+            updateOption(option, delta, menu->data);
         }
     }
 
     if(down)
     {
-        drawBitIcon(icon, left.x, left.y, tic_color_white);
+        drawBitIcon(menu->studio, icon, left.x, left.y, tic_color_white);
     }
     else
     {
-        drawBitIcon(icon, left.x, left.y, tic_color_black);
-        drawBitIcon(icon, left.x, left.y - 1, over ? tic_color_white : tic_color_light_grey);
+        drawBitIcon(menu->studio, icon, left.x, left.y, tic_color_black);
+        drawBitIcon(menu->studio, icon, left.x, left.y - 1, over ? tic_color_white : tic_color_light_grey);
     }
 }
 
 static void drawMenu(Menu* menu, s32 x, s32 y)
 {
-    if (getStudioMode() != TIC_MENU_MODE)
+    if (getStudioMode(menu->studio) != TIC_MENU_MODE)
         return;
 
     tic_mem* tic = menu->tic;
@@ -233,14 +227,14 @@ static void drawMenu(Menu* menu, s32 x, s32 y)
         if(tic_api_btnp(menu->tic, Up, Hold, Period)
             || tic_api_keyp(tic, tic_key_up, Hold, Period))
         {
-            playSystemSfx(2);
+            playSystemSfx(menu->studio, 2);
             menu->anim.movie = resetMovie(&menu->anim.up);
         }
 
         if(tic_api_btnp(menu->tic, Down, Hold, Period)
             || tic_api_keyp(tic, tic_key_down, Hold, Period))
         {
-            playSystemSfx(2);
+            playSystemSfx(menu->studio, 2);
             menu->anim.movie = resetMovie(&menu->anim.down);
         }
 
@@ -251,15 +245,15 @@ static void drawMenu(Menu* menu, s32 x, s32 y)
             if(tic_api_btnp(menu->tic, Left, Hold, Period)
                 || tic_api_keyp(tic, tic_key_left, Hold, Period))
             {
-                playSystemSfx(2);
-                updateOption(option, -1);
+                playSystemSfx(menu->studio, 2);
+                updateOption(option, -1, menu->data);
             }
 
             if(tic_api_btnp(menu->tic, Right, Hold, Period)
                 || tic_api_keyp(tic, tic_key_right, Hold, Period))
             {
-                playSystemSfx(2);
-                updateOption(option, +1);
+                playSystemSfx(menu->studio, 2);
+                updateOption(option, +1, menu->data);
             }            
         }
 
@@ -268,8 +262,8 @@ static void drawMenu(Menu* menu, s32 x, s32 y)
         {
             if(option)
             {
-                playSystemSfx(2);
-                updateOption(option, +1);
+                playSystemSfx(menu->studio, 2);
+                updateOption(option, +1, menu->data);
             }
             else if(menu->items[menu->pos].handler)
                 onMenuItem(menu, item);
@@ -279,7 +273,7 @@ static void drawMenu(Menu* menu, s32 x, s32 y)
             || tic_api_keyp(tic, tic_key_backspace, Hold, Period)) 
                 && menu->back)
         {
-            playSystemSfx(2);
+            playSystemSfx(menu->studio, 2);
             menu->anim.movie = resetMovie(&menu->anim.back);
         }
     }
@@ -293,14 +287,14 @@ static void drawMenu(Menu* menu, s32 x, s32 y)
             y + TextMargin + ItemHeight * (i - menu->pos) - menu->anim.pos, it->width, TIC_FONT_HEIGHT};
 
         bool down = false;
-        if(animIdle(menu) && checkMousePos(&rect) && it->handler)
+        if(animIdle(menu) && checkMousePos(menu->studio, &rect) && it->handler)
         {
-            setCursor(tic_cursor_hand);
+            setCursor(menu->studio, tic_cursor_hand);
 
-            if(checkMouseDown(&rect, tic_mouse_left))
+            if(checkMouseDown(menu->studio, &rect, tic_mouse_left))
                 down = true;
 
-            if(checkMouseClick(&rect, tic_mouse_left))
+            if(checkMouseClick(menu->studio, &rect, tic_mouse_left))
             {
                 if(it->handler)
                 {
@@ -357,7 +351,7 @@ void studio_menu_anim_scanline(tic_mem* tic, s32 row, void* data)
 {
     s32 dir = row < TIC80_HEIGHT / 2 ? 1 : -1;
     s32 val = dir * (TIC80_WIDTH - row * 7 / 2);
-    tic_rgb* dst = tic->ram.vram.palette.colors + BG_ANIM_COLOR;
+    tic_rgb* dst = tic->ram->vram.palette.colors + BG_ANIM_COLOR;
 
     memcpy(dst, &(tic_rgb){val * 3 / 4, val * 4 / 5, val}, sizeof(tic_rgb));
 }
@@ -369,41 +363,42 @@ static void drawCursor(Menu* menu, s32 x, s32 y)
     tic_api_rect(tic, x, y - (menu->anim.cursor - ItemHeight) / 2, TIC80_WIDTH, menu->anim.cursor, tic_color_red);
 }
 
-Menu* studio_menu_create(struct tic_mem* tic)
+Menu* studio_menu_create(Studio* studio)
 {
     Menu* menu = malloc(sizeof(Menu));
     *menu = (Menu)
     {
-        .tic = tic,
+        .studio = studio,
+        .tic = getMemory(studio),
         .anim =
         {
             .idle = {.done = emptyDone,},
 
             .start = MOVIE_DEF(10, startDone,
             {
-                {-10, 0, 10, &menu->anim.top, linear},
-                {10, 0, 10, &menu->anim.bottom, linear},
-                {0, 10, 10, &menu->anim.cursor, linear},
-                {-TIC80_WIDTH, 0, 10, &menu->anim.offset, linear},
+                {-10, 0, 10, &menu->anim.top, AnimLinear},
+                {10, 0, 10, &menu->anim.bottom, AnimLinear},
+                {0, 10, 10, &menu->anim.cursor, AnimLinear},
+                {-TIC80_WIDTH, 0, 10, &menu->anim.offset, AnimLinear},
             }),
 
-            .up = MOVIE_DEF(9, menuUpDone, {{0, -9, 9, &menu->anim.pos, easein}}),
-            .down = MOVIE_DEF(9, menuDownDone, {{0, 9, 9, &menu->anim.pos, easein}}),
+            .up = MOVIE_DEF(9, menuUpDone, {{0, -9, 9, &menu->anim.pos, AnimEaseIn}}),
+            .down = MOVIE_DEF(9, menuDownDone, {{0, 9, 9, &menu->anim.pos, AnimEaseIn}}),
 
             .close = MOVIE_DEF(10, closeDone,
             {
-                {0, -10, 10, &menu->anim.top, linear},
-                {0, 10, 10, &menu->anim.bottom, linear},
-                {10, 0, 10, &menu->anim.cursor, linear},
-                {0, TIC80_WIDTH, 10, &menu->anim.offset, linear},
+                {0, -10, 10, &menu->anim.top, AnimLinear},
+                {0, 10, 10, &menu->anim.bottom, AnimLinear},
+                {10, 0, 10, &menu->anim.cursor, AnimLinear},
+                {0, TIC80_WIDTH, 10, &menu->anim.offset, AnimLinear},
             }),
 
             .back = MOVIE_DEF(10, backDone,
             {
-                {0, -10, 10, &menu->anim.top, linear},
-                {0, 10, 10, &menu->anim.bottom, linear},
-                {10, 0, 10, &menu->anim.cursor, linear},
-                {0, TIC80_WIDTH, 10, &menu->anim.offset, linear},
+                {0, -10, 10, &menu->anim.top, AnimLinear},
+                {0, 10, 10, &menu->anim.bottom, AnimLinear},
+                {10, 0, 10, &menu->anim.cursor, AnimLinear},
+                {0, TIC80_WIDTH, 10, &menu->anim.offset, AnimLinear},
             }),
         },
     };
@@ -422,7 +417,7 @@ void studio_menu_tick(Menu* menu)
     // process scroll
     if(animIdle(menu))
     {
-        tic80_input* input = &tic->ram.input;
+        tic80_input* input = &tic->ram->input;
 
         if(input->mouse.scrolly)
         {
@@ -430,7 +425,7 @@ void studio_menu_tick(Menu* menu)
             {
                 MenuOption* option = menu->items[menu->pos].option;
                 if(option)
-                    updateOption(option, input->mouse.scrolly < 0 ? -1 : +1);
+                    updateOption(option, input->mouse.scrolly < 0 ? -1 : +1, menu->data);
             }
             else
             {
@@ -440,15 +435,15 @@ void studio_menu_tick(Menu* menu)
         }
     }
 
-    if(getStudioMode() != TIC_MENU_MODE)
+    if(getStudioMode(menu->studio) != TIC_MENU_MODE)
         return;
 
     studio_menu_anim(tic, menu->ticks);
 
     VBANK(tic, 1)
     {
-        tic_api_cls(tic, tic->ram.vram.vars.clear = tic_color_blue);
-        memcpy(tic->ram.vram.palette.data, getConfig()->cart->bank0.palette.vbank0.data, sizeof(tic_palette));
+        tic_api_cls(tic, tic->ram->vram.vars.clear = tic_color_blue);
+        memcpy(tic->ram->vram.palette.data, getConfig(menu->studio)->cart->bank0.palette.vbank0.data, sizeof(tic_palette));
 
         drawCursor(menu, 0, (TIC80_HEIGHT - ItemHeight) / 2);
         drawMenu(menu, 0, (TIC80_HEIGHT - ItemHeight) / 2);
@@ -459,12 +454,13 @@ void studio_menu_tick(Menu* menu)
     menu->ticks++;
 }
 
-void studio_menu_init(Menu* menu, const MenuItem* items, s32 rows, s32 pos, s32 backPos, void(*back)(void*), void* data)
+void studio_menu_init(Menu* menu, const MenuItem* items, s32 rows, s32 pos, s32 backPos, MenuItemHandler back, void* data)
 {
     const s32 size = sizeof menu->items[0] * rows;
 
     *menu = (Menu)
     {
+        .studio = menu->studio,
         .tic = menu->tic,
         .anim = menu->anim,
         .items = realloc(menu->items, size),
@@ -496,7 +492,7 @@ void studio_menu_init(Menu* menu, const MenuItem* items, s32 rows, s32 pos, s32 
                     menu->maxwidth.option = len;
             }
 
-            it->option->pos = it->option->get();
+            it->option->pos = it->option->get(menu->data);
         }
     }
 
@@ -507,7 +503,7 @@ bool studio_menu_back(Menu* menu)
 {
     if(menu->back)
     {
-        playSystemSfx(2);
+        playSystemSfx(menu->studio, 2);
         menu->anim.movie = resetMovie(&menu->anim.back);
     }
 

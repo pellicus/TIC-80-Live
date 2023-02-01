@@ -1,0 +1,150 @@
+# Target
+dst
+!*/**/dst
+janet
+!*/**/janet
+/build
+/builddir
+/Build
+/Release
+/Debug
+/Emscripten
+/src/include/generated/*.h
+janet-*.tar.gz
+dist
+
+# jpm lockfile
+lockfile.janet
+
+# Kakoune (fzf via fd)
+.fdignore
+
+# VSCode
+.vscode
+
+# Eclipse
+.project
+.cproject
+
+# Gnome Builder
+.buildconfig
+
+# Local directory for testing
+local
+
+# Common test files I use.
+temp.janet
+temp*.janet
+scratch.janet
+
+# Emscripten
+*.bc
+janet.js
+janet.wasm
+
+# Generated files
+*.gen.h
+*.gen.c
+
+# Generate test files
+*.out
+.orig
+
+# Tools
+xxd
+xxd.exe
+
+# VSCode
+.vs
+.clangd
+
+# Swap files
+*.swp
+
+# Tags
+tags
+
+# Valgrind files
+vgcore.*
+*.out.*
+
+# WiX artifacts
+*.msi
+*.wixpdb
+
+# Makefile config
+/config.mk
+
+# Created by https://www.gitignore.io/api/c
+
+### C ###
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+*.elf
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Libraries
+*.lib
+*.a
+*.la
+*.lo
+
+# Shared objects (inc. Windows DLLs)
+*.dll
+*.so
+*.so.*
+*.dylib
+
+# Executables
+*.exe
+*.out
+*.app
+*.i*86
+*.x86_64
+*.hex
+
+# Debug files
+*.dSYM/
+*.su
+*.idb
+*.pdb
+
+# Kernel Module Compile Results
+*.mod*
+*.cmd
+modules.order
+Module.symvers
+Mkfile.old
+dkms.conf
+
+# End of https://www.gitignore.io/api/c
+
+# Created by https://www.gitignore.io/api/cmake
+
+### CMake ###
+CMakeCache.txt
+CMakeFiles
+CMakeScripts
+Testing
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+CTestTestfile.cmake
+
+# End of https://www.gitignore.io/api/cmake
+
+# Astyle
+*.orig

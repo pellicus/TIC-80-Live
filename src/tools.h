@@ -79,6 +79,14 @@ inline u32 tic_rgba(const tic_rgb* c)
     return (0xff << 24) | (c->b << 16) | (c->g << 8) | (c->r << 0);
 }
 
+inline s32 tic_modulo(s32 x, s32 m)
+{
+    if(x >= m) return x % m;
+    if(x < 0) return x % m + m;
+
+    return x;
+}
+
 tic_blitpal tic_tool_palette_blit(const tic_palette* src, tic80_pixel_color_format fmt);
 
 bool    tic_tool_parse_note(const char* noteStr, s32* note, s32* octave);
@@ -99,6 +107,6 @@ bool    tic_tool_empty(const void* buffer, s32 size);
 bool    tic_tool_flat4(const void* buffer, s32 size);
 #define FLAT4(BUFFER) (tic_tool_flat4((BUFFER), sizeof (BUFFER)))
 
+bool    tic_tool_noise(const tic_waveform* wave);
 u32     tic_nearest_color(const tic_rgb* palette, const tic_rgb* color, s32 count);
-
-char* tic_tool_metatag(const char* code, const char* tag, const char* comment);
+char*   tic_tool_metatag(const char* code, const char* tag, const char* comment);

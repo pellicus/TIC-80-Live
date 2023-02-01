@@ -178,16 +178,22 @@ static void evalFennel(tic_mem* tic, const char* code) {
 
 tic_script_config FennelSyntaxConfig =
 {
+    .id                 = 14,
     .name               = "fennel",
     .fileExtension      = ".fnl",
     .projectComment     = ";;",
-    .init               = initFennel,
-    .close              = closeLua,
-    .tick               = callLuaTick,
-    .callback           =
     {
+      .init               = initFennel,
+      .close              = closeLua,
+      .tick               = callLuaTick,
+      .boot               = callLuaBoot,
+
+      .callback           =
+      {
         .scanline       = callLuaScanline,
         .border         = callLuaBorder,
+        .menu           = callLuaMenu,
+      },
     },
 
     .getOutline         = getFennelOutline,

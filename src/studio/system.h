@@ -57,6 +57,7 @@ void    tic_sys_fullscreen_set(bool value);
 void    tic_sys_message(const char* title, const char* message);
 void    tic_sys_title(const char* title);
 void    tic_sys_open_path(const char* path);
+void    tic_sys_open_url(const char* path);
 void    tic_sys_preseed();
 bool    tic_sys_keyboard_text(char* text);
 void    tic_sys_update_config();
@@ -87,6 +88,7 @@ typedef struct
             bool shadow;
             bool altFont;
             bool matchDelimiters;
+            bool autoDelimiters;
 
         } code;
 
@@ -116,16 +118,20 @@ typedef struct
     } shader;
 #endif
 
-    struct
+    struct StudioOptions
     {
-    #if defined(CRT_SHADER_SUPPORT)
+#if defined(CRT_SHADER_SUPPORT)
         bool crt;
-    #endif
+#endif
         
         bool fullscreen;
         bool vsync;
         s32 volume;
         tic_mapping mapping;
+
+#if defined(BUILD_EDITORS)
+        bool devmode;
+#endif
     } options;
 
     const tic_cartridge* cart;
@@ -134,21 +140,18 @@ typedef struct
 
 } StudioConfig;
 
-typedef struct
-{
-    tic_mem* tic;
-    bool quit;
+typedef struct Studio Studio;
 
-    void (*tick)();
-    void (*sound)();
-    void (*exit)();
-    void (*close)();
-    void (*load)(const char* file);
-    const StudioConfig* (*config)();
+const tic_mem* studio_mem(Studio* studio);
+void studio_tick(Studio* studio, tic80_input input);
+void studio_sound(Studio* studio);
+void studio_load(Studio* studio, const char* file);
+bool studio_alive(Studio* studio);
+void studio_exit(Studio* studio);
+void studio_delete(Studio* studio);
+const StudioConfig* studio_config(Studio* studio);
 
-} Studio;
-
-Studio* studioInit(s32 argc, char **argv, s32 samplerate, const char* appFolder);
+Studio* studio_create(s32 argc, char **argv, s32 samplerate, tic80_pixel_color_format format, const char* appFolder, s32 maxscale);
 
 #ifdef __cplusplus
 }

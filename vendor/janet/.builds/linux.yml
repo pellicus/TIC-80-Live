@@ -1,0 +1,21 @@
+image: archlinux
+sources:
+- https://git.sr.ht/~bakpakin/janet
+packages:
+- meson
+tasks:
+- with-epoll: |
+    cd janet
+    meson setup with-epoll --buildtype=release
+    cd with-epoll
+    meson configure -Depoll=true
+    ninja
+    ninja test
+- no-epoll: |
+    cd janet
+    meson setup no-epoll --buildtype=release
+    cd no-epoll
+    meson configure -Depoll=false
+    ninja
+    ninja test
+    sudo ninja install

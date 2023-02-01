@@ -24,6 +24,12 @@
 #include "fs.h"
 #include "cart.h"
 
+#if defined(__EMSCRIPTEN__)
+#define DEFAULT_VSYNC 0
+#else
+#define DEFAULT_VSYNC 1
+#endif
+
 #if defined (TIC_BUILD_WITH_LUA)
 #include <lua.h>
 #include <lauxlib.h>
@@ -143,6 +149,7 @@ static void readCodeTheme(Config* config, lua_State* lua)
         readBool(lua, "SHADOW", &config->data.theme.code.shadow);
         readBool(lua, "ALT_FONT", &config->data.theme.code.altFont);
         readBool(lua, "MATCH_DELIMITERS", &config->data.theme.code.matchDelimiters);
+        readBool(lua, "AUTO_DELIMITERS", &config->data.theme.code.autoDelimiters);
     }
 
     lua_pop(lua, 1);
@@ -205,14 +212,7 @@ static void readConfig(Config* config)
 }
 #else
 
-static void readConfig(Config* config)
-{
-    config->data = (StudioConfig)
-    {
-        .uiScale = 4,
-        .cart = config->cart,
-    };
-}
+static void readConfig(Config* config) {}
 
 #endif
 
@@ -221,7 +221,7 @@ static void update(Config* config, const u8* buffer, s32 size)
     tic_cart_load(config->cart, buffer, size);
 
     readConfig(config);
-    studioConfigChanged();
+    studioConfigChanged(config->studio);
 }
 
 static void setDefault(Config* config)
@@ -229,14 +229,18 @@ static void setDefault(Config* config)
     config->data = (StudioConfig)
     {
         .cart = config->cart,
+        .uiScale = 4,
         .options = 
         {
 #if defined(CRT_SHADER_SUPPORT)
-            .crt        = false,
+            .crt            = false,
 #endif
-            .volume     = MAX_VOLUME,
-            .vsync      = true,
-            .fullscreen = false,
+            .volume         = MAX_VOLUME,
+            .vsync          = DEFAULT_VSYNC,
+            .fullscreen     = false,
+#if defined(BUILD_EDITORS)
+            .devmode        = false,
+#endif
         },
     };
 
@@ -283,7 +287,7 @@ static void save(Config* config)
     readConfig(config);
     saveConfig(config, true);
 
-    studioConfigChanged();
+    studioConfigChanged(config->studio);
 }
 
 static const char OptionsDatPath[] = TIC_LOCAL_VERSION "options.dat";
@@ -298,11 +302,12 @@ static void loadConfigData(tic_fs* fs, const char* path, void* dst, s32 size)
             memcpy(dst, data, size);
 }
 
-void initConfig(Config* config, tic_mem* tic, tic_fs* fs)
+void initConfig(Config* config, Studio* studio, tic_fs* fs)
 {
     *config = (Config)
     {
-        .tic = tic,
+        .studio = studio,
+        .tic = getMemory(studio),
         .cart = realloc(config->cart, sizeof(tic_cartridge)),
         .save = save,
         .reset = reset,
@@ -327,7 +332,7 @@ void initConfig(Config* config, tic_mem* tic, tic_fs* fs)
 
     loadConfigData(fs, OptionsDatPath, &config->data.options, sizeof config->data.options);
 
-    tic_api_reset(tic);
+    tic_api_reset(config->tic);
 }
 
 void freeConfig(Config* config)

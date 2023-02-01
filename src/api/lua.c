@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 
 // Copyright (c) 2017 Vadim Grigoruk @nesbox // grigoruk@gmail.com
 
@@ -420,6 +420,10 @@ static s32 lua_trib(lua_State* lua)
     return 0;
 }
 
+#if defined(BUILD_DEPRECATED)
+
+void drawTexturedTriangleDep(tic_core* core, float x1, float y1, float x2, float y2, float x3, float y3, float u1, float v1, float u2, float v2, float u3, float v3, bool use_map, u8* colors, s32 count);
+
 static s32 lua_textri(lua_State* lua)
 {
     s32 top = lua_gettop(lua);
@@ -439,6 +443,7 @@ static s32 lua_textri(lua_State* lua)
         //  check for use map 
         if (top >= 13)
             use_map = lua_toboolean(lua, 13);
+
         //  check for chroma 
         if(top >= 14)
         {
@@ -467,16 +472,95 @@ static s32 lua_textri(lua_State* lua)
             }
         }
 
-        tic_api_textri(tic, pt[0], pt[1],   //  xy 1
-                                    pt[2], pt[3],   //  xy 2
-                                    pt[4], pt[5],   //  xy 3
-                                    pt[6], pt[7],   //  uv 1
-                                    pt[8], pt[9],   //  uv 2
-                                    pt[10], pt[11], //  uv 3
-                                    use_map,        // use map
-                                    colors, count);        // chroma
+        drawTexturedTriangleDep(getLuaCore(lua), 
+            pt[0], pt[1],   //  xy 1
+            pt[2], pt[3],   //  xy 2
+            pt[4], pt[5],   //  xy 3
+            pt[6], pt[7],   //  uv 1
+            pt[8], pt[9],   //  uv 2
+            pt[10], pt[11], //  uv 3
+            use_map,        // use map
+            colors, count); // chroma
     }
-    else luaL_error(lua, "invalid parameters, textri(x1,y1,x2,y2,x3,y3,u1,v1,u2,v2,u3,v3,[use_map=false],[chroma=off])\n");
+
+    return 0;
+}
+
+#endif
+
+static s32 lua_ttri(lua_State* lua)
+{
+    s32 top = lua_gettop(lua);
+
+    if (top >= 12)
+    {
+        float pt[12];
+
+        for (s32 i = 0; i < COUNT_OF(pt); i++)
+            pt[i] = (float)lua_tonumber(lua, i + 1);
+
+        tic_mem* tic = (tic_mem*)getLuaCore(lua);
+        static u8 colors[TIC_PALETTE_SIZE];
+        s32 count = 0;
+        tic_texture_src src = tic_tiles_texture;
+
+        //  check for texture src
+        if (top >= 13)
+        {
+            src = lua_isboolean(lua, 13) 
+                ? (lua_toboolean(lua, 13) ? tic_map_texture : tic_tiles_texture) 
+                : lua_tointeger(lua, 13);
+        }
+        //  check for chroma 
+        if(top >= 14)
+        {
+            if(lua_istable(lua, 14))
+            {
+                for(s32 i = 1; i <= TIC_PALETTE_SIZE; i++)
+                {
+                    lua_rawgeti(lua, 14, i);
+                    if(lua_isnumber(lua, -1))
+                    {
+                        colors[i-1] = getLuaNumber(lua, -1);
+                        count++;
+                        lua_pop(lua, 1);
+                    }
+                    else
+                    {
+                        lua_pop(lua, 1);
+                        break;
+                    }
+                }
+            }
+            else 
+            {
+                colors[0] = getLuaNumber(lua, 14);
+                count = 1;
+            }
+        }
+
+        float z[3];
+        bool depth = false;
+
+        if(top == 17)
+        {
+            for (s32 i = 0; i < COUNT_OF(z); i++)
+                z[i] = (float)lua_tonumber(lua, i + 15);
+
+            depth = true;
+        }
+
+        tic_api_ttri(tic, pt[0], pt[1],   //  xy 1
+                            pt[2], pt[3],   //  xy 2
+                            pt[4], pt[5],   //  xy 3
+                            pt[6], pt[7],   //  uv 1
+                            pt[8], pt[9],   //  uv 2
+                            pt[10], pt[11], //  uv 3
+                            src,            // texture source
+                            colors, count,  // chroma
+                            z[0], z[1], z[2], depth); // depth
+    }
+    else luaL_error(lua, "invalid parameters, ttri(x1,y1,x2,y2,x3,y3,u1,v1,u2,v2,u3,v3,[src=0],[chroma=off],[z1=0],[z2=0],[z3=0])\n");
     return 0;
 }
 
@@ -805,9 +889,16 @@ static s32 lua_music(lua_State* lua)
     if(top == 0) tic_api_music(tic, -1, 0, 0, false, false, -1, -1);
     else if(top >= 1)
     {
+        s32 track = getLuaNumber(lua, 1);
+
+        if(track > MUSIC_TRACKS - 1)
+        {
+            luaL_error(lua, "invalid music track index");
+            return 0;
+        }
+
         tic_api_music(tic, -1, 0, 0, false, false, -1, -1);
 
-        s32 track = getLuaNumber(lua, 1);
         s32 frame = -1;
         s32 row = -1;
         bool loop = true;
@@ -865,7 +956,7 @@ static s32 lua_sfx(lua_State* lua)
         s32 octave = -1;
         s32 duration = -1;
         s32 channel = 0;
-        s32 volumes[TIC_STEREO_CHANNELS] = {MAX_VOLUME, MAX_VOLUME};
+        s32 volumes[TIC80_SAMPLE_CHANNELS] = {MAX_VOLUME, MAX_VOLUME};
         s32 speed = SFX_DEF_SPEED;
 
         s32 index = getLuaNumber(lua, 1);
@@ -874,7 +965,7 @@ static s32 lua_sfx(lua_State* lua)
         {
             if (index >= 0)
             {
-                tic_sample* effect = tic->ram.sfx.samples.data + index;
+                tic_sample* effect = tic->ram->sfx.samples.data + index;
 
                 note = effect->note;
                 octave = effect->octave;
@@ -1176,7 +1267,7 @@ static s32 lua_font(lua_State* lua)
             return 1;
         }
 
-        s32 size = tic_api_font(tic, text, x, y, chromakey, width, height, fixed, scale, alt);
+        s32 size = tic_api_font(tic, text, x, y, &chromakey, 1, width, height, fixed, scale, alt);
 
         lua_pushinteger(lua, size);
 
@@ -1334,7 +1425,7 @@ static s32 lua_mouse(lua_State *lua)
         lua_pushinteger(lua, pos.y);
     }
 
-    const tic80_mouse* mouse = &core->memory.ram.input.mouse;
+    const tic80_mouse* mouse = &core->memory.ram->input.mouse;
 
     lua_pushboolean(lua, mouse->left);
     lua_pushboolean(lua, mouse->middle);
@@ -1431,9 +1522,16 @@ void lua_open_builtins(lua_State *lua)
 
 void initLuaAPI(tic_core* core)
 {
+    static const struct{lua_CFunction func; const char* name;} ApiItems[] = 
+    {
 #define API_FUNC_DEF(name, ...) {lua_ ## name, #name},
-    static const struct{lua_CFunction func; const char* name;} ApiItems[] = {TIC_API_LIST(API_FUNC_DEF)};
-#undef API_FUNC_DEF
+        TIC_API_LIST(API_FUNC_DEF)
+#undef  API_FUNC_DEF
+
+#if defined(BUILD_DEPRECATED)    
+        {lua_textri, "textri"},
+#endif
+    };
 
     for (s32 i = 0; i < COUNT_OF(ApiItems); i++)
         registerLuaFunction(core, ApiItems[i].func, ApiItems[i].name);
@@ -1584,9 +1682,26 @@ void callLuaBorder(tic_mem* tic, s32 row, void* data)
     callLuaIntCallback(tic, row, data, BDR_FN);
 }
 
-void callLuaGameMenu(tic_mem* tic, s32 index, void* data)
+void callLuaMenu(tic_mem* tic, s32 index, void* data)
 {
     callLuaIntCallback(tic, index, data, MENU_FN);
+}
+
+void callLuaBoot(tic_mem* tic)
+{
+    tic_core* core = (tic_core*)tic;
+    lua_State* lua = core->currentVM;
+
+    if (lua)
+    {
+        lua_getglobal(lua, BOOT_FN);
+        if(lua_isfunction(lua, -1))
+        {
+            if(docall(lua, 0, 0) != LUA_OK)
+                core->data->error(core->data->data, lua_tostring(lua, -1));
+        }
+        else lua_pop(lua, 1);
+    }
 }
 
 static const char* const LuaKeywords [] =
@@ -1675,18 +1790,22 @@ static void evalLua(tic_mem* tic, const char* code) {
 
 tic_script_config LuaSyntaxConfig = 
 {
+    .id                 = 10,
     .name               = "lua",
     .fileExtension      = ".lua",
     .projectComment     = "--",
-    .init               = initLua,
-    .close              = closeLua,
-    .tick               = callLuaTick,
-
-    .callback           =
     {
+      .init               = initLua,
+      .close              = closeLua,
+      .tick               = callLuaTick,
+      .boot               = callLuaBoot,
+
+      .callback           =
+      {
         .scanline       = callLuaScanline,
         .border         = callLuaBorder,
-        .gamemenu       = callLuaGameMenu,
+        .menu           = callLuaMenu,
+      },
     },
 
     .getOutline         = getLuaOutline,

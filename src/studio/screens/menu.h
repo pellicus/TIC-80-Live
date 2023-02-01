@@ -26,24 +26,30 @@
 
 typedef struct Menu Menu;
 struct tic_mem;
+struct Studio;
 
-Menu* studio_menu_create(struct tic_mem* tic);
+Menu* studio_menu_create(struct Studio* studio);
 void studio_menu_tick(Menu* menu);
+
+typedef s32(*MenuOptionGetHandler)(void*);
+typedef void(*MenuOptionSetHandler)(void*, s32);
 
 typedef struct
 {
     const char** values;
     s32 count;
-    s32(*get)();
-    void(*set)(s32);
+    MenuOptionGetHandler get;
+    MenuOptionSetHandler set;
     s32 width;
     s32 pos;
 } MenuOption;
 
+typedef void(*MenuItemHandler)(void*, s32);
+
 typedef struct
 {
     const char* label;
-    void(*handler)(void*);
+    MenuItemHandler handler;
 
     MenuOption* option;
     const char* help;
@@ -51,7 +57,7 @@ typedef struct
     s32 width;
 } MenuItem;
 
-void studio_menu_init(Menu* menu, const MenuItem* items, s32 rows, s32 pos, s32 backPos, void(*back)(void*), void* data);
+void studio_menu_init(Menu* menu, const MenuItem* items, s32 rows, s32 pos, s32 backPos, MenuItemHandler handler, void* data);
 bool studio_menu_back(Menu* menu);
 void studio_menu_free(Menu* menu);
 

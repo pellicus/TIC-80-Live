@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 
 // Copyright (c) 2017 Vadim Grigoruk @nesbox // grigoruk@gmail.com
 // Copyright (c) 2020-2021 Jeremiasz Nelz <jeremiasz ~at~ nelz.pl>
@@ -297,16 +297,16 @@ static mrb_value mrb_trib(mrb_state* mrb, mrb_value self)
     return mrb_nil_value();
 }
 
-static mrb_value mrb_textri(mrb_state* mrb, mrb_value self)
+static mrb_value mrb_ttri(mrb_state* mrb, mrb_value self)
 {
     mrb_value chroma = mrb_fixnum_value(0xff);
-    mrb_bool use_map = false;
+    mrb_int src = tic_tiles_texture;
 
-    mrb_float x1, y1, x2, y2, x3, y3, u1, v1, u2, v2, u3, v3;
-    mrb_int argc = mrb_get_args(mrb, "ffffffffffff|bo",
+    mrb_float x1, y1, x2, y2, x3, y3, u1, v1, u2, v2, u3, v3, z1, z2, z3;
+    mrb_int argc = mrb_get_args(mrb, "ffffffffffff|iofff",
             &x1, &y1, &x2, &y2, &x3, &y3,
             &u1, &v1, &u2, &v2, &u3, &v3,
-            &use_map, &chroma);
+            &src, &chroma, &z1, &z2, &z3);
 
     mrb_int count;
     u8 *chromas;
@@ -329,10 +329,10 @@ static mrb_value mrb_textri(mrb_state* mrb, mrb_value self)
 
     tic_mem* memory = (tic_mem*)getMRubyMachine(mrb);
 
-    tic_api_textri(memory,
+    tic_api_ttri(memory,
                         x1, y1, x2, y2, x3, y3,
                         u1, v1, u2, v2, u3, v3,
-                        use_map, chromas, count);
+                        src, chromas, count, z1, z2, z3, argc == 17);
 
     free(chromas);
 
@@ -402,11 +402,11 @@ static mrb_value mrb_btn(mrb_state* mrb, mrb_value self)
 
     if (argc == 0)
     {
-        return mrb_fixnum_value(machine->memory.ram.input.gamepads.data);
+        return mrb_fixnum_value(machine->memory.ram->input.gamepads.data);
     }
     else if (argc == 1)
     {
-        return mrb_bool_value(machine->memory.ram.input.gamepads.data & (1 << index));
+        return mrb_bool_value(machine->memory.ram->input.gamepads.data & (1 << index));
     }
     else
     {
@@ -628,7 +628,10 @@ static mrb_value mrb_music(mrb_state* mrb, mrb_value self)
 
     if(track >= 0)
     {
-        tic_api_music(memory, track, frame, row, loop, sustain, tempo, speed);
+        if(track > MUSIC_TRACKS - 1)
+            mrb_raise(mrb, E_ARGUMENT_ERROR, "invalid music track index");
+        else
+            tic_api_music(memory, track, frame, row, loop, sustain, tempo, speed);
     }
 
     return mrb_nil_value();
@@ -644,7 +647,7 @@ static mrb_value mrb_sfx(mrb_state* mrb, mrb_value self)
     mrb_int duration = -1;
     mrb_int channel = 0;
     mrb_value volume = mrb_int_value(mrb, MAX_VOLUME);
-    mrb_int volumes[TIC_STEREO_CHANNELS];
+    mrb_int volumes[TIC80_SAMPLE_CHANNELS];
     mrb_int speed = SFX_DEF_SPEED;
 
     mrb_int argc = mrb_get_args(mrb, "i|oiio!i", &index, &note_obj, &duration, &channel, &volume, &speed);
@@ -653,14 +656,14 @@ static mrb_value mrb_sfx(mrb_state* mrb, mrb_value self)
 
     if (mrb_array_p(volume))
     {
-        for (mrb_int i = 0; i < TIC_STEREO_CHANNELS; ++i)
+        for (mrb_int i = 0; i < TIC80_SAMPLE_CHANNELS; ++i)
         {
             volumes[i] = mrb_integer(mrb_ary_entry(volume, i));
         }
     }
     else if (mrb_fixnum_p(volume))
     {
-        for (size_t ch = 0; ch < TIC_STEREO_CHANNELS; ++ch)
+        for (size_t ch = 0; ch < TIC80_SAMPLE_CHANNELS; ++ch)
         {
             volumes[ch] = mrb_integer(volume);
         }
@@ -675,7 +678,7 @@ static mrb_value mrb_sfx(mrb_state* mrb, mrb_value self)
     {
         if (index >= 0)
         {
-            tic_sample* effect = memory->ram.sfx.samples.data + index;
+            tic_sample* effect = memory->ram->sfx.samples.data + index;
 
             note = effect->note;
             octave = effect->octave;
@@ -868,7 +871,7 @@ static mrb_value mrb_font(mrb_state* mrb, mrb_value self)
 
     const char* text = mrb_value_to_cstr(mrb, text_obj);
 
-    s32 size = tic_api_font(memory, text, x, y, width, height, chromakey, scale, fixed, alt);
+    s32 size = tic_api_font(memory, text, x, y, (u8*)&chromakey, 1, width, height, scale, fixed, alt);
     return mrb_fixnum_value(size);
 }
 
@@ -961,7 +964,7 @@ static mrb_value mrb_mouse(mrb_state *mrb, mrb_value self)
 
     tic_core* machine = getMRubyMachine(mrb);
 
-    const tic80_mouse* mouse = &machine->memory.ram.input.mouse;
+    const tic80_mouse* mouse = &machine->memory.ram->input.mouse;
 
     mrb_value hash = mrb_hash_new(mrb);
 
@@ -1089,6 +1092,23 @@ static void callMRubyTick(tic_mem* tic)
     }
 }
 
+static void callMRubyBoot(tic_mem* tic)
+{
+    tic_core* machine = (tic_core*)tic;
+    const char* BootFunc = BOOT_FN;
+
+    mrb_state* mrb = ((mrbVm*)machine->currentVM)->mrb;
+
+    if(mrb)
+    {
+        if (mrb_respond_to(mrb, mrb_top_self(mrb), mrb_intern_cstr(mrb, BootFunc)))
+        {
+            mrb_funcall(mrb, mrb_top_self(mrb), BootFunc, 0);
+            catcherr(machine);
+        }
+    }
+}
+
 static void callMRubyIntCallback(tic_mem* memory, s32 value, void* data, const char* name)
 {
     tic_core* machine = (tic_core*)memory;
@@ -1113,7 +1133,7 @@ static void callMRubyBorder(tic_mem* memory, s32 row, void* data)
     callMRubyIntCallback(memory, row, data, BDR_FN);
 }
 
-static void callMRubyGameMenu(tic_mem* memory, s32 index, void* data)
+static void callMRubyMenu(tic_mem* memory, s32 index, void* data)
 {
     callMRubyIntCallback(memory, index, data, MENU_FN);
 }
@@ -1201,18 +1221,20 @@ static const tic_outline_item* getMRubyOutline(const char* code, s32* size)
 
 const tic_script_config MRubySyntaxConfig =
 {
+    .id                 = 11,
     .name               = "ruby",
     .fileExtension      = ".rb",
     .projectComment     = "#",
     .init               = initMRuby,
     .close              = closeMRuby,
     .tick               = callMRubyTick,
+    .boot               = callMRubyBoot,
 
     .callback           =
     {
         .scanline       = callMRubyScanline,
         .border         = callMRubyBorder,
-        .gamemenu       = callMRubyGameMenu,
+        .menu           = callMRubyMenu,
     },
 
     .getOutline         = getMRubyOutline,

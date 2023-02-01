@@ -1,4 +1,4 @@
-﻿// MIT License
+// MIT License
 
 // Copyright (c) 2017 Vadim Grigoruk @nesbox // grigoruk@gmail.com
 
@@ -313,7 +313,7 @@ static duk_ret_t duk_sfx(duk_context* duk)
     {
         if(index >= 0)
         {
-            tic_sample* effect = tic->ram.sfx.samples.data + index;
+            tic_sample* effect = tic->ram->sfx.samples.data + index;
 
             note = effect->note;
             octave = effect->octave;
@@ -346,7 +346,7 @@ static duk_ret_t duk_sfx(duk_context* duk)
 
     s32 duration = duk_opt_int(duk, 2, -1);
     s32 channel = duk_opt_int(duk, 3, 0);
-    s32 volumes[TIC_STEREO_CHANNELS];
+    s32 volumes[TIC80_SAMPLE_CHANNELS];
 
     if(duk_is_array(duk, 4))
     {
@@ -679,7 +679,7 @@ static duk_ret_t duk_font(duk_context* duk)
         return 1;
     }
 
-    s32 size = tic_api_font(tic, text, x, y, chromakey, width, height, fixed, scale, alt);
+    s32 size = tic_api_font(tic, text, x, y, &chromakey, 1, width, height, fixed, scale, alt);
 
     duk_push_int(duk, size);
 
@@ -690,7 +690,7 @@ static duk_ret_t duk_mouse(duk_context* duk)
 {
     tic_core* core = getDukCore(duk);
 
-    const tic80_mouse* mouse = &core->memory.ram.input.mouse;
+    const tic80_mouse* mouse = &core->memory.ram->input.mouse;
 
     duk_idx_t idx = duk_push_array(duk);
 
@@ -807,6 +807,10 @@ static duk_ret_t duk_trib(duk_context* duk)
     return 0;
 }
 
+#if defined(BUILD_DEPRECATED)
+
+void drawTexturedTriangleDep(tic_core* core, float x1, float y1, float x2, float y2, float x3, float y3, float u1, float v1, float u2, float v2, float u3, float v3, bool use_map, u8* colors, s32 count);
+
 static duk_ret_t duk_textri(duk_context* duk)
 {
     float pt[12];
@@ -814,7 +818,7 @@ static duk_ret_t duk_textri(duk_context* duk)
     for (s32 i = 0; i < COUNT_OF(pt); i++)
         pt[i] = (float)duk_to_number(duk, i);
     tic_mem* tic = (tic_mem*)getDukCore(duk);
-    bool use_map = duk_opt_boolean(duk, 12, false);
+    bool use_map = duk_to_boolean(duk, 12);
 
     static u8 colors[TIC_PALETTE_SIZE];
     s32 count = 0;
@@ -847,14 +851,79 @@ static duk_ret_t duk_textri(duk_context* duk)
         }
     }
 
-    tic_api_textri(tic, pt[0], pt[1],   //  xy 1
-                        pt[2], pt[3],   //  xy 2
-                        pt[4], pt[5],   //  xy 3
-                        pt[6], pt[7],   //  uv 1
-                        pt[8], pt[9],   //  uv 2
-                        pt[10], pt[11],//  uv 3
-                        use_map, // usemap
-                        colors, count);    //  chroma
+    drawTexturedTriangleDep(getDukCore(duk), 
+        pt[0], pt[1],   //  xy 1
+        pt[2], pt[3],   //  xy 2
+        pt[4], pt[5],   //  xy 3
+        pt[6], pt[7],   //  uv 1
+        pt[8], pt[9],   //  uv 2
+        pt[10], pt[11], //  uv 3
+        use_map,        //  use_map
+        colors, count); //  chroma
+
+    return 0;
+}
+
+#endif
+
+static duk_ret_t duk_ttri(duk_context* duk)
+{
+    float pt[12];
+
+    for (s32 i = 0; i < COUNT_OF(pt); i++)
+        pt[i] = (float)duk_to_number(duk, i);
+    tic_mem* tic = (tic_mem*)getDukCore(duk);
+    tic_texture_src src = duk_to_int(duk, 12);
+
+    static u8 colors[TIC_PALETTE_SIZE];
+    s32 count = 0;
+    {
+        if(!duk_is_null_or_undefined(duk, 13))
+        {
+            if(duk_is_array(duk, 13))
+            {
+                for(s32 i = 0; i < TIC_PALETTE_SIZE; i++)
+                {
+                    duk_get_prop_index(duk, 13, i);
+                    if(duk_is_null_or_undefined(duk, -1))
+                    {
+                        duk_pop(duk);
+                        break;
+                    }
+                    else
+                    {
+                        colors[i] = duk_to_int(duk, -1);
+                        count++;
+                        duk_pop(duk);
+                    }
+                }
+            }
+            else
+            {
+                colors[0] = duk_to_int(duk, 13);
+                count = 1;
+            }
+        }
+    }
+
+    float z[3];
+    bool depth = true;
+
+    for (s32 i = 0, index = 14; i < COUNT_OF(z); i++, index++)
+    {
+        if(duk_is_null_or_undefined(duk, index)) depth = false;
+        else z[i] = (float)duk_to_number(duk, index);
+    }
+
+    tic_api_ttri(tic, pt[0], pt[1],               //  xy 1
+                        pt[2], pt[3],               //  xy 2
+                        pt[4], pt[5],               //  xy 3
+                        pt[6], pt[7],               //  uv 1
+                        pt[8], pt[9],               //  uv 2
+                        pt[10], pt[11],             //  uv 3
+                        src,                        //  texture source
+                        colors, count,              //  chroma
+                        z[0], z[1], z[2], depth);   // depth 
 
     return 0;
 }
@@ -883,6 +952,9 @@ static duk_ret_t duk_music(duk_context* duk)
 
     if(track >= 0)
     {
+        if(track > MUSIC_TRACKS - 1)
+            return duk_error(duk, DUK_ERR_ERROR, "invalid music track index");
+
         s32 frame = duk_opt_int(duk, 1, -1);
         s32 row = duk_opt_int(duk, 2, -1);
         bool loop = duk_opt_boolean(duk, 3, true);
@@ -976,9 +1048,16 @@ static void initDuktape(tic_core* core)
         duk_pop(duk);
     }
 
+    static const struct{duk_c_function func; s32 params; const char* name;} ApiItems[] = 
+    {
 #define API_FUNC_DEF(name, _, __, paramsCount, ...) {duk_ ## name, paramsCount, #name},
-    static const struct{duk_c_function func; s32 params; const char* name;} ApiItems[] = {TIC_API_LIST(API_FUNC_DEF)};
-#undef API_FUNC_DEF
+        TIC_API_LIST(API_FUNC_DEF)
+#undef  API_FUNC_DEF
+
+#if defined(BUILD_DEPRECATED)    
+        {duk_textri, 14, "textri"},
+#endif
+    };
 
     for (s32 i = 0; i < COUNT_OF(ApiItems); i++)
     {
@@ -1069,9 +1148,23 @@ static void callJavascriptBorder(tic_mem* tic, s32 row, void* data)
     callJavascriptIntCallback(tic, row, data, BDR_FN);
 }
 
-static void callJavascriptGameMenu(tic_mem* tic, s32 index, void* data)
+static void callJavascriptMenu(tic_mem* tic, s32 index, void* data)
 {
     callJavascriptIntCallback(tic, index, data, MENU_FN);
+}
+
+static void callJavascriptBoot(tic_mem* tic)
+{
+    tic_core* core = (tic_core*)tic;
+    duk_context* duk = core->currentVM;
+
+    if(duk_get_global_string(duk, BOOT_FN))
+    {
+        if(duk_pcall(duk, 0) != 0)
+            core->data->error(core->data->data, duk_safe_to_stacktrace(duk, -1));
+    }
+
+    duk_pop(duk);
 }
 
 static const char* const JsKeywords [] =
@@ -1151,17 +1244,21 @@ void evalJs(tic_mem* tic, const char* code) {
 
 const tic_script_config JsSyntaxConfig =
 {
+    .id                 = 12,
     .name               = "js",
     .fileExtension      = ".js",
     .projectComment     = "//",
-    .init               = initJavascript,
-    .close              = closeJavascript,
-    .tick               = callJavascriptTick,
-    .callback           =
     {
+      .init               = initJavascript,
+      .close              = closeJavascript,
+      .tick               = callJavascriptTick,
+      .boot               = callJavascriptBoot,
+      .callback           =
+      {
         .scanline       = callJavascriptScanline,
         .border         = callJavascriptBorder,
-        .gamemenu       = callJavascriptGameMenu,
+        .menu           = callJavascriptMenu,
+      },
     },
 
     .getOutline         = getJsOutline,

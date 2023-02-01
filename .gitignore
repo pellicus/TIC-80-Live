@@ -4,6 +4,7 @@
 *.suo
 sexit
 .vscode/
+build/install_manifest.txt
 build/vendor/
 build/uwp/tic/Debug/
 build/uwp/tic/Release/
@@ -134,6 +135,7 @@ Makefile
 !build/baremetalpi/Makefile
 !build/baremetalpi/boot/Makefile
 !build/baremetalpi/toolchain.cmake
+!templates/c/Makefile
 build/android/.gradle/
 build/android/app/.externalNativeBuild/
 build/android/app/build/
@@ -174,3 +176,6 @@ CMakeSettings.json
 tic_mruby_build_config.rb.lock
 tic_mruby_wasm_build_config.rb.lock
 build/mruby_vendor-prefix/
+**/zig-cache
+**/zig-out
+.cache

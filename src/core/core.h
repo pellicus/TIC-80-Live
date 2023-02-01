@@ -158,7 +158,7 @@ typedef struct
 
     struct ClipRect
     {
-        u8 l, t, r, b;
+        s32 l, t, r, b;
     } clip;
 
     bool initialized;
@@ -167,6 +167,7 @@ typedef struct
 typedef struct
 {
     tic_mem memory; // it should be first
+    tic80_pixel_color_format screen_format;
 
     void* currentVM;
     const tic_script_config* currentScript;
@@ -185,6 +186,7 @@ typedef struct
     {
         tic_core_state_data state;   
         tic_ram ram;
+        u8 input;
 
         struct
         {
@@ -203,7 +205,7 @@ void tic_core_sound_tick_end(tic_mem* memory);
 // for backward compatibility
 #define OVR_COMPAT(CORE, BANK)                                              \
     tic_api_vbank(&CORE->memory, BANK),                                     \
-    CORE->memory.ram.vram.vars.cursor = CORE->state.vbank.mem.vars.cursor
+    CORE->memory.ram->vram.vars.cursor = CORE->state.vbank.mem.vars.cursor
 
 #define OVR(CORE)                                   \
     s32 MACROVAR(_bank_) = CORE->state.vbank.id;    \

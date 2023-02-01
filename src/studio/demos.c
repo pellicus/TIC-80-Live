@@ -155,10 +155,56 @@ tic_script_config_extra SquirrelSyntaxConfigExtra =
 #endif
 
 
+#if defined(TIC_BUILD_WITH_WASM)
+
+static const u8 WasmDemoRom[] =
+{
+    #include "../build/assets/wasmdemo.tic.dat"
+};
+
+static const u8 wasmmark[] =
+{
+    #include "../build/assets/wasmmark.tic.dat"
+};
+
+tic_script_config_extra WasmSyntaxConfigExtra =
+{
+    .name               = "wasm",
+    .demoRom            = WasmDemoRom,
+    .demoRomSize        = sizeof WasmDemoRom,
+    .markRom            = wasmmark,
+    .markRomSize        = sizeof wasmmark,
+};
+
+#endif
+
+#if defined(TIC_BUILD_WITH_JANET)
+
+static const u8 JanetDemoRom[] =
+  {
+#include "../build/assets/janetdemo.tic.dat"
+  };
+
+static const u8 janetmark[] =
+  {
+#include "../build/assets/janetmark.tic.dat"
+  };
+
+tic_script_config_extra JanetSyntaxConfigExtra =
+  {
+    .name               = "janet",
+    .demoRom            = JanetDemoRom,
+    .demoRomSize        = sizeof JanetDemoRom,
+    .markRom            = janetmark,
+    .markRomSize        = sizeof janetmark,
+  };
+
+#endif
+
 tic_script_config_extra* getConfigExtra(const tic_script_config* config)
 {
 
-    for (tic_script_config_extra** conf = LanguagesExtra ; *conf != NULL; conf++ ) { 
+    for (tic_script_config_extra** conf = LanguagesExtra ; *conf != NULL; conf++ ) {
         tic_script_config_extra* ln = *conf;
         if (strcmp(config->name, ln->name) == 0)
         {
@@ -190,7 +236,11 @@ tic_script_config_extra* LanguagesExtra[] = {
 #if defined(TIC_BUILD_WITH_MRUBY)
    &MRubySyntaxConfigExtra,
 #endif
+#if defined(TIC_BUILD_WITH_WASM)
+   &WasmSyntaxConfigExtra,
+#endif
+#if defined(TIC_BUILD_WITH_JANET)
+   &JanetSyntaxConfigExtra,
+#endif
    NULL
 };
-
-
