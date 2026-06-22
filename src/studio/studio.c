@@ -1942,10 +1942,20 @@ static void processShortcuts(Studio* studio)
 }
 
 #if defined(BUILD_EDITORS)
+static void reloadProject(Studio* studio)
+{
+    const bool running = studio->mode == TIC_RUN_MODE;
+
+    studio->console->updateProject(studio->console);
+
+    if(running)
+        runGame(studio);
+}
+
 static void reloadConfirm(Studio* studio, bool yes, void* data)
 {
     if(yes)
-        studio->console->updateProject(studio->console);
+        reloadProject(studio);
     else
         updateMDate(studio);
 }
@@ -1975,7 +1985,7 @@ static void checkChanges(Studio* studio)
 
                     confirmDialog(studio, Rows, COUNT_OF(Rows), reloadConfirm, NULL);
                 }
-                else console->updateProject(console);
+                else reloadProject(studio);
             }
         }
     }
